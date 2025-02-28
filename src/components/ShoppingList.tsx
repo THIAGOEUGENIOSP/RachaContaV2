@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
-import { Trash2, Plus, Check, ShoppingBag, ChevronDown, ChevronRight } from 'lucide-react';
+import { Trash2, Plus, Check, ShoppingBag, ChevronDown, ChevronRight, Search } from 'lucide-react';
 
 interface ShoppingListProps {
   supabase: SupabaseClient<Database>;
@@ -29,10 +29,39 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
     higiene: true,
     outros: true
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredItems, setFilteredItems] = useState<ShoppingItem[]>([]);
 
   useEffect(() => {
     fetchItems();
   }, []);
+
+  // Atualizar itens filtrados quando os itens ou o termo de busca mudam
+  useEffect(() => {
+    filterItems();
+  }, [items, searchTerm]);
+
+  // Expandir categorias que contêm itens filtrados
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      const groupedItems = filteredItems.reduce((acc, item) => {
+        if (!acc[item.category]) {
+          acc[item.category] = [];
+        }
+        acc[item.category].push(item);
+        return acc;
+      }, {} as Record<string, ShoppingItem[]>);
+      
+      const categoriesToExpand = Object.keys(groupedItems);
+      const newExpandedState = { ...expandedCategories };
+      
+      categoriesToExpand.forEach(category => {
+        newExpandedState[category] = true;
+      });
+      
+      setExpandedCategories(newExpandedState);
+    }
+  }, [filteredItems, searchTerm]);
 
   const fetchItems = async () => {
     try {
@@ -144,8 +173,36 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
     }));
   };
 
+  // Função para normalizar texto (remover acentos)
+  const normalizeText = (text: string): string => {
+    return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  };
+
+  // Filtrar itens com base no termo de busca
+  const filterItems = () => {
+    if (!searchTerm.trim()) {
+      setFilteredItems(items);
+      return;
+    }
+    
+    const normalizedSearchTerm = normalizeText(searchTerm);
+    
+    const filtered = items.filter(item => {
+      const normalizedName = normalizeText(item.name);
+      
+      // Busca por iniciais, palavras contidas, letras finais
+      return (
+        normalizedName.startsWith(normalizedSearchTerm) || // Iniciais
+        normalizedName.includes(normalizedSearchTerm) ||   // Contém a palavra/letras
+        normalizedName.endsWith(normalizedSearchTerm)      // Letras finais
+      );
+    });
+    
+    setFilteredItems(filtered);
+  };
+
   // Group items by category
-  const groupedItems = items.reduce((acc, item) => {
+  const groupedItems = filteredItems.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
     }
@@ -155,27 +212,28 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Lista de Compras</h2>
+      <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Lista de Compras</h2>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         <div className="lg:col-span-1">
-          <div className="card">
-            <h3 className="text-xl font-semibold mb-4">Adicionar Item</h3>
+          <div className="card p-3 md:p-6">
+            <h3 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">Adicionar Item</h3>
             
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label htmlFor="name">Nome do Item:</label>
+                <label htmlFor="name" className="text-sm">Nome do Item:</label>
                 <input
                   type="text"
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
+                  className="text-sm md:text-base"
                 />
               </div>
               
               <div className="form-group">
-                <label htmlFor="quantity">Quantidade:</label>
+                <label htmlFor="quantity" className="text-sm">Quantidade:</label>
                 <input
                   type="number"
                   id="quantity"
@@ -183,16 +241,18 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
                   value={quantity}
                   onChange={(e) => setQuantity(parseInt(e.target.value))}
                   required
+                  className="text-sm md:text-base"
                 />
               </div>
               
               <div className="form-group">
-                <label htmlFor="category">Categoria:</label>
+                <label htmlFor="category" className="text-sm">Categoria:</label>
                 <select
                   id="category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   required
+                  className="text-sm md:text-base"
                 >
                   <option value="alimentos">Alimentos</option>
                   <option value="bebidas">Bebidas</option>
@@ -204,14 +264,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
               
               <button
                 type="submit"
-                className="btn-primary w-full flex items-center justify-center"
+                className="btn-primary w-full flex items-center justify-center text-sm md:text-base"
                 disabled={isLoading}
               >
                 {isLoading ? (
                   'Adicionando...'
                 ) : (
                   <>
-                    <Plus size={18} className="mr-2" />
+                    <Plus size={16} className="mr-2 flex-shrink-0" />
                     Adicionar Item
                   </>
                 )}
@@ -221,21 +281,53 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
         </div>
         
         <div className="lg:col-span-2">
-          <div className="card">
+          <div className="card p-3 md:p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">Itens para Comprar</h3>
-              <div className="text-sm text-gray-500">
-                {items.filter(i => !i.completed).length} itens pendentes
+              <h3 className="text-lg md:text-xl font-semibold">Itens para Comprar</h3>
+              <div className="text-xs md:text-sm text-gray-500">
+                {filteredItems.filter(i => !i.completed).length} itens pendentes
               </div>
             </div>
             
+            {/* Campo de busca */}
+            <div className="relative mb-4">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search size={16} className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Buscar itens..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            
             {isLoading && items.length === 0 ? (
-              <p className="text-center py-4">Carregando itens...</p>
-            ) : items.length === 0 ? (
+              <p className="text-center py-4 text-sm">Carregando itens...</p>
+            ) : filteredItems.length === 0 ? (
               <div className="text-center py-8">
-                <ShoppingBag size={48} className="mx-auto text-gray-300 mb-2" />
-                <p className="text-gray-500">Sua lista de compras está vazia.</p>
-                <p className="text-sm text-gray-400">Adicione itens para começar.</p>
+                {items.length === 0 ? (
+                  <>
+                    <ShoppingBag size={48} className="mx-auto text-gray-300 mb-2" />
+                    <p className="text-gray-500">Sua lista de compras está vazia.</p>
+                    <p className="text-sm text-gray-400">Adicione itens para começar.</p>
+                  </>
+                ) : (
+                  <>
+                    <Search size={48} className="mx-auto text-gray-300 mb-2" />
+                    <p className="text-gray-500">Nenhum item encontrado para "{searchTerm}"</p>
+                    <p className="text-sm text-gray-400">Tente outro termo de busca.</p>
+                  </>
+                )}
               </div>
             ) : (
               <div>
