@@ -7,6 +7,7 @@ import {
   CreditCard, 
   ShoppingCart, 
   FileText,
+  Upload,
   Menu,
   X
 } from 'lucide-react';
@@ -25,6 +26,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({ activeSection, setActiveSect
     { id: 'expenses', label: 'Despesas', icon: <DollarSign size={20} /> },
     { id: 'balances', label: 'Saldos', icon: <BarChart2 size={20} /> },
     { id: 'payments', label: 'Histórico de Pagamentos', icon: <CreditCard size={20} /> },
+    { id: 'contributions', label: 'Aportes Mensais', icon: <Upload size={20} /> },
     { id: 'shopping-list', label: 'Lista de Compras', icon: <ShoppingCart size={20} /> },
     { id: 'reports', label: 'Relatórios', icon: <FileText size={20} /> },
   ];

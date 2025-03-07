@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
-import { Trash2, Plus, Users, DollarSign, RefreshCw } from 'lucide-react';
+import { Trash2, Plus, Users, DollarSign, RefreshCw, UserCheck, UserX } from 'lucide-react';
 import { formatCurrency, parseInputValue } from '../utils/formatters';
 
 interface ExpensesProps {
@@ -423,39 +423,65 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
               
               <div className="form-group">
                 <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm">Participantes:</label>
-                  <div className="space-x-2 text-xs">
+                  <label className="text-sm font-medium text-gray-700">Participantes:</label>
+                  <div className="space-x-2">
                     <button 
                       type="button" 
                       onClick={handleSelectAllParticipants}
-                      className="text-blue-600 hover:text-blue-800"
+                      className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center"
                     >
-                      Selecionar todos
+                      <UserCheck size={14} className="mr-1" />
+                      Todos
                     </button>
-                    <span>|</span>
+                    <span className="text-gray-300">|</span>
                     <button 
                       type="button" 
                       onClick={handleDeselectAllParticipants}
-                      className="text-blue-600 hover:text-blue-800"
+                      className="text-xs text-red-600 hover:text-red-700 flex items-center"
                     >
-                      Limpar
+                      <UserX size={14} className="mr-1" />
+                      Nenhum
                     </button>
                   </div>
                 </div>
-                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto p-2 border border-gray-200 rounded-md">
+                <div className="grid grid-cols-1 gap-2 bg-gray-50 rounded-lg p-3">
                   {participants.map(participant => (
-                    <div key={participant.id} className="flex items-center">
+                    <label
+                      key={participant.id}
+                      className={`
+                        flex items-center p-2 rounded-md cursor-pointer transition-colors
+                        ${selectedParticipants.includes(participant.id)
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-white hover:bg-gray-100'
+                        }
+                      `}
+                    >
                       <input
                         type="checkbox"
-                        id={`participant-${participant.id}`}
                         checked={selectedParticipants.includes(participant.id)}
                         onChange={() => handleParticipantToggle(participant.id)}
-                        className="mr-2"
+                        className="sr-only"
                       />
-                      <label htmlFor={`participant-${participant.id}`} className="text-xs md:text-sm">
-                        {participant.name} {participant.type === 'casal' ? '(Casal)' : ''}
-                      </label>
-                    </div>
+                      <div className={`
+                        w-4 h-4 rounded border flex items-center justify-center mr-3
+                        ${selectedParticipants.includes(participant.id)
+                          ? 'bg-emerald-500 border-emerald-500'
+                          : 'border-gray-300'
+                        }
+                      `}>
+                        {selectedParticipants.includes(participant.id) && (
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="text-sm">{participant.name}</span>
+                      {participant.type === 'casal' && (
+                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                          Casal
+                        </span>
+                      )}
+                    </label>
                   ))}
                 </div>
               </div>
@@ -470,7 +496,6 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
                   className="text-sm md:text-base"
                 >
                   <option value="equal">Igual (por adulto)</option>
-                  {/* Outros tipos de divisão podem ser adicionados no futuro */}
                 </select>
               </div>
               
@@ -551,7 +576,6 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
         </div>
       </div>
       
-      {/* Modal para exibir participantes da despesa */}
       {showParticipantModal && currentExpenseId && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-4 md:p-6 max-w-md w-full">

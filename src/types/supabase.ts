@@ -136,6 +136,35 @@ export interface Database {
           created_at?: string
         }
       }
+      contributions: {
+        Row: {
+          id: string
+          participant_id: string
+          amount: number
+          month: string
+          receipt_url: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          participant_id: string
+          amount: number
+          month: string
+          receipt_url?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          participant_id?: string
+          amount?: number
+          month?: string
+          receipt_url?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+      }
     }
   }
 }

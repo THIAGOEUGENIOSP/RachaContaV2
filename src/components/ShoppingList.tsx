@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
-import { Trash2, Plus, Check, ShoppingBag, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { Trash2, Plus, Check, ShoppingBag, ChevronDown, ChevronRight, Search, AlertCircle } from 'lucide-react';
 
 interface ShoppingListProps {
   supabase: SupabaseClient<Database>;
@@ -69,8 +69,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
       const { data, error } = await supabase
         .from('shopping_list')
         .select('*')
-        .order('category', { ascending: true })
-        .order('completed', { ascending: true })
+        .order('completed', { ascending: true }) // Uncompleted items first
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -331,68 +330,93 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
               </div>
             ) : (
               <div>
-                {Object.keys(groupedItems).map((category) => (
-                  <div key={category} className="mb-4">
-                    <button 
-                      onClick={() => toggleCategory(category)}
-                      className="w-full flex items-center justify-between font-medium text-gray-700 bg-gray-100 p-3 rounded mb-2 hover:bg-gray-200 transition-colors"
-                    >
-                      <span>{formatCategory(category)}</span>
-                      <span className="flex items-center">
-                        <span className="mr-2 text-sm text-gray-500">
-                          {groupedItems[category].length} itens
+                {Object.keys(groupedItems).map((category) => {
+                  const pendingItems = groupedItems[category].filter(item => !item.completed).length;
+                  return (
+                    <div key={category} className="mb-4">
+                      <button 
+                        onClick={() => toggleCategory(category)}
+                        className={`w-full flex items-center justify-between font-medium p-3 rounded mb-2 transition-colors ${
+                          pendingItems > 0
+                            ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        <span className="flex items-center">
+                          {pendingItems > 0 && (
+                            <AlertCircle size={16} className="text-red-500 mr-2" />
+                          )}
+                          {formatCategory(category)}
                         </span>
-                        {expandedCategories[category] ? (
-                          <ChevronDown size={18} />
-                        ) : (
-                          <ChevronRight size={18} />
-                        )}
-                      </span>
-                    </button>
-                    
-                    {expandedCategories[category] && (
-                      <div className="space-y-2 pl-2">
-                        {groupedItems[category].map((item) => (
-                          <div 
-                            key={item.id} 
-                            className={`flex items-center p-3 rounded-lg border ${
-                              item.completed 
-                                ? 'bg-gray-50 border-gray-200 text-gray-500' 
-                                : 'bg-white border-gray-200'
-                            }`}
-                          >
-                            <button
-                              onClick={() => toggleItemStatus(item.id, item.completed)}
-                              className={`mr-3 p-1 rounded-full ${
-                                item.completed 
-                                  ? 'bg-emerald-100 text-emerald-500' 
-                                  : 'bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-500'
-                              }`}
-                              title={item.completed ? "Marcar como não comprado" : "Marcar como comprado"}
-                            >
-                              <Check size={16} />
-                            </button>
-                            
-                            <div className={`flex-1 ${item.completed ? 'line-through' : ''}`}>
-                              <div className="font-medium">{item.name}</div>
-                              <div className="text-sm text-gray-500">
-                                Quantidade: {item.quantity}
+                        <span className="flex items-center">
+                          <span className={`mr-2 text-sm ${
+                            pendingItems > 0 ? 'text-red-500 font-semibold' : 'text-gray-500'
+                          }`}>
+                            {pendingItems} pendentes
+                          </span>
+                          {expandedCategories[category] ? (
+                            <ChevronDown size={18} />
+                          ) : (
+                            <ChevronRight size={18} />
+                          )}
+                        </span>
+                      </button>
+                      
+                      {expandedCategories[category] && (
+                        <div className="space-y-2 pl-2">
+                          {groupedItems[category]
+                            .sort((a, b) => {
+                              // Sort by completion status first (incomplete items first)
+                              if (a.completed !== b.completed) {
+                                return a.completed ? 1 : -1;
+                              }
+                              // Then by creation date
+                              return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime();
+                            })
+                            .map((item) => (
+                              <div 
+                                key={item.id} 
+                                className={`flex items-center p-3 rounded-lg transition-all duration-200 ${
+                                  item.completed 
+                                    ? 'bg-gray-50 border border-gray-200 text-gray-500' 
+                                    : 'bg-white border-2 border-emerald-500 shadow-lg hover:shadow-emerald-100'
+                                }`}
+                              >
+                                <button
+                                  onClick={() => toggleItemStatus(item.id, item.completed)}
+                                  className={`mr-3 p-1.5 rounded-full transition-colors ${
+                                    item.completed 
+                                      ? 'bg-emerald-100 text-emerald-500' 
+                                      : 'bg-emerald-100 text-emerald-500 hover:bg-emerald-200'
+                                  }`}
+                                  title={item.completed ? "Marcar como não comprado" : "Marcar como comprado"}
+                                >
+                                  <Check size={18} />
+                                </button>
+                                
+                                <div className={`flex-1 ${item.completed ? 'line-through' : 'font-medium'}`}>
+                                  <div className={item.completed ? 'text-gray-500' : 'text-emerald-700'}>
+                                    {item.name}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    Quantidade: {item.quantity}
+                                  </div>
+                                </div>
+                                
+                                <button
+                                  onClick={() => handleDelete(item.id)}
+                                  className="text-red-500 hover:text-red-700 p-1"
+                                  title="Excluir"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
                               </div>
-                            </div>
-                            
-                            <button
-                              onClick={() => handleDelete(item.id)}
-                              className="text-red-500 hover:text-red-700 p-1"
-                              title="Excluir"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
