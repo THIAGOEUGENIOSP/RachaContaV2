@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
-import { Trash2, RefreshCw } from 'lucide-react';
+import { Trash2, RefreshCw, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 
 interface PaymentsProps {
   supabase: SupabaseClient<Database>;
+  carnivalId?: string | null;
 }
 
 interface Participant {
@@ -24,17 +25,27 @@ interface Payment {
   receiver?: Participant;
 }
 
-export const Payments: React.FC<PaymentsProps> = ({ supabase }) => {
+export const Payments: React.FC<PaymentsProps> = ({ supabase, carnivalId }) => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPayments();
-  }, []);
+    if (carnivalId) {
+      fetchPayments();
+    }
+  }, [carnivalId]);
 
   const fetchPayments = async () => {
     try {
       setIsLoading(true);
+      setError(null);
+
+      if (!carnivalId) {
+        setPayments([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('payments')
         .select(`
@@ -42,16 +53,14 @@ export const Payments: React.FC<PaymentsProps> = ({ supabase }) => {
           payer:payer_id(id, name),
           receiver:receiver_id(id, name)
         `)
+        .eq('carnival_id', carnivalId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching payments:', error);
-        return;
-      }
-      
+      if (error) throw error;
       setPayments(data || []);
     } catch (error) {
       console.error('Error fetching payments:', error);
+      setError('Não foi possível carregar os pagamentos. Por favor, tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -82,6 +91,33 @@ export const Payments: React.FC<PaymentsProps> = ({ supabase }) => {
       setIsLoading(false);
     }
   };
+
+  if (!carnivalId) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle size={48} className="mx-auto text-gray-400 mb-4" />
+          <p className="text-gray-600">Selecione um carnaval para ver os pagamentos</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <AlertCircle size={48} className="text-red-500 mb-4" />
+        <p className="text-gray-700 mb-4">{error}</p>
+        <button
+          onClick={fetchPayments}
+          className="btn-primary flex items-center"
+        >
+          <RefreshCw size={16} className="mr-2" />
+          Tentar Novamente
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>

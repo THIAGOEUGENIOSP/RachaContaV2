@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
-import { FileText, Download, PieChart } from 'lucide-react';
+import { FileText, Download, PieChart, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 import Chart from 'chart.js/auto';
 import { jsPDF } from 'jspdf';
 
 interface ReportsProps {
   supabase: SupabaseClient<Database>;
+  carnivalId?: string | null;
 }
 
 interface ExpenseSummary {
@@ -16,25 +17,36 @@ interface ExpenseSummary {
   percentage: number;
 }
 
-export const Reports: React.FC<ReportsProps> = ({ supabase }) => {
+export const Reports: React.FC<ReportsProps> = ({ supabase, carnivalId }) => {
   const [expenseSummary, setExpenseSummary] = useState<ExpenseSummary[]>([]);
   const [totalExpense, setTotalExpense] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart | null>(null);
 
   useEffect(() => {
-    fetchReportData();
-  }, []);
+    if (carnivalId) {
+      fetchReportData();
+    }
+  }, [carnivalId]);
 
   const fetchReportData = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       
-      // Fetch expenses
+      if (!carnivalId) {
+        setExpenseSummary([]);
+        setTotalExpense(0);
+        return;
+      }
+
+      // Fetch expenses for this carnival
       const { data: expenses, error } = await supabase
         .from('expenses')
-        .select('*');
+        .select('*')
+        .eq('carnival_id', carnivalId);
 
       if (error) throw error;
       
@@ -64,9 +76,17 @@ export const Reports: React.FC<ReportsProps> = ({ supabase }) => {
         
         // Update chart
         updateChart(summary);
+      } else {
+        setExpenseSummary([]);
+        setTotalExpense(0);
+        if (chartInstance.current) {
+          chartInstance.current.destroy();
+          chartInstance.current = null;
+        }
       }
     } catch (error) {
       console.error('Error fetching report data:', error);
+      setError('Não foi possível carregar os dados do relatório. Por favor, tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +95,6 @@ export const Reports: React.FC<ReportsProps> = ({ supabase }) => {
   const updateChart = (summary: ExpenseSummary[]) => {
     if (!chartRef.current) return;
     
-    // Destroy previous chart if it exists
     if (chartInstance.current) {
       chartInstance.current.destroy();
     }
@@ -211,6 +230,33 @@ export const Reports: React.FC<ReportsProps> = ({ supabase }) => {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (!carnivalId) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle size={48} className="mx-auto text-gray-400 mb-4" />
+          <p className="text-gray-600">Selecione um carnaval para ver os relatórios</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <AlertCircle size={48} className="text-red-500 mb-4" />
+        <p className="text-gray-700 mb-4">{error}</p>
+        <button
+          onClick={fetchReportData}
+          className="btn-primary flex items-center"
+        >
+          <RefreshCw size={16} className="mr-2" />
+          Tentar Novamente
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>

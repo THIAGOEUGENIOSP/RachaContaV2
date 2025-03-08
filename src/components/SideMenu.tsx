@@ -1,13 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  Home, 
-  Users, 
-  DollarSign, 
-  BarChart2, 
-  CreditCard, 
-  ShoppingCart, 
-  FileText,
+  Calendar,
   Upload,
+  Users,
   Menu,
   X
 } from 'lucide-react';
@@ -19,17 +14,6 @@ interface SideMenuProps {
 
 export const SideMenu: React.FC<SideMenuProps> = ({ activeSection, setActiveSection }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  
-  const menuItems = [
-    { id: 'overview', label: 'Visão Geral', icon: <Home size={20} /> },
-    { id: 'participants', label: 'Participantes', icon: <Users size={20} /> },
-    { id: 'expenses', label: 'Despesas', icon: <DollarSign size={20} /> },
-    { id: 'balances', label: 'Saldos', icon: <BarChart2 size={20} /> },
-    { id: 'payments', label: 'Histórico de Pagamentos', icon: <CreditCard size={20} /> },
-    { id: 'contributions', label: 'Aportes Mensais', icon: <Upload size={20} /> },
-    { id: 'shopping-list', label: 'Lista de Compras', icon: <ShoppingCart size={20} /> },
-    { id: 'reports', label: 'Relatórios', icon: <FileText size={20} /> },
-  ];
 
   const handleMenuItemClick = (sectionId: string) => {
     setActiveSection(sectionId);
@@ -38,7 +22,6 @@ export const SideMenu: React.FC<SideMenuProps> = ({ activeSection, setActiveSect
 
   return (
     <>
-      {/* Mobile menu toggle button - only visible on small screens */}
       <div className="md:hidden fixed top-4 left-4 z-30">
         <button 
           onClick={() => setMenuOpen(!menuOpen)}
@@ -48,7 +31,6 @@ export const SideMenu: React.FC<SideMenuProps> = ({ activeSection, setActiveSect
         </button>
       </div>
       
-      {/* Overlay for mobile menu */}
       {menuOpen && (
         <div 
           className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-20"
@@ -56,37 +38,59 @@ export const SideMenu: React.FC<SideMenuProps> = ({ activeSection, setActiveSect
         ></div>
       )}
       
-      {/* Side menu - transforms to full width on mobile when open */}
       <div className={`
-        bg-white shadow-md h-full
+        bg-white shadow-md h-full flex flex-col
         md:w-64 md:relative md:block
         fixed top-0 left-0 z-20 w-64 transition-transform duration-300 ease-in-out
         ${menuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         <div className="p-4 border-b border-gray-200">
           <div className="flex flex-col items-center">
-            <h1 className="text-xl font-bold text-emerald-600">🎭 Carnaval 2025</h1>
-            <h2 className="text-lg font-medium text-emerald-500">RachaConta</h2>
+            <h1 className="text-xl font-bold text-emerald-600">🎭 RachaConta</h1>
           </div>
         </div>
         
-        <nav className="mt-4">
+        <nav className="flex-1 mt-4">
           <ul>
-            {menuItems.map((item) => (
-              <li key={item.id}>
-                <button
-                  onClick={() => handleMenuItemClick(item.id)}
-                  className={`flex items-center w-full px-4 py-3 text-left ${
-                    activeSection === item.id
-                      ? 'bg-emerald-50 text-emerald-600 border-r-4 border-emerald-500'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <span className="mr-3">{item.icon}</span>
-                  {item.label}
-                </button>
-              </li>
-            ))}
+            <li>
+              <button
+                onClick={() => handleMenuItemClick('carnivals')}
+                className={`flex items-center w-full px-4 py-3 text-left ${
+                  activeSection === 'carnivals'
+                    ? 'bg-emerald-50 text-emerald-600 border-r-4 border-emerald-500'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <span className="mr-3"><Calendar size={20} /></span>
+                Carnavais
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => handleMenuItemClick('contributions')}
+                className={`flex items-center w-full px-4 py-3 text-left ${
+                  activeSection === 'contributions'
+                    ? 'bg-emerald-50 text-emerald-600 border-r-4 border-emerald-500'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <span className="mr-3"><Upload size={20} /></span>
+                Aportes Mensais
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => handleMenuItemClick('registered-participants')}
+                className={`flex items-center w-full px-4 py-3 text-left ${
+                  activeSection === 'registered-participants'
+                    ? 'bg-emerald-50 text-emerald-600 border-r-4 border-emerald-500'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <span className="mr-3"><Users size={20} /></span>
+                Participantes Cadastrados
+              </button>
+            </li>
           </ul>
         </nav>
       </div>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
-import { Trash2, Plus, Check, ShoppingBag, ChevronDown, ChevronRight, Search, AlertCircle } from 'lucide-react';
+import { Trash2, Plus, Check, ShoppingBag, ChevronDown, ChevronRight, Search, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface ShoppingListProps {
   supabase: SupabaseClient<Database>;
+  carnivalId?: string | null;
 }
 
 interface ShoppingItem {
@@ -14,14 +15,16 @@ interface ShoppingItem {
   category: string;
   completed: boolean;
   created_at?: string;
+  carnival_id?: string;
 }
 
-export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
+export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase, carnivalId }) => {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [category, setCategory] = useState('alimentos');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     alimentos: true,
     bebidas: true,
@@ -33,15 +36,15 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
   const [filteredItems, setFilteredItems] = useState<ShoppingItem[]>([]);
 
   useEffect(() => {
-    fetchItems();
-  }, []);
+    if (carnivalId) {
+      fetchItems();
+    }
+  }, [carnivalId]);
 
-  // Atualizar itens filtrados quando os itens ou o termo de busca mudam
   useEffect(() => {
     filterItems();
   }, [items, searchTerm]);
 
-  // Expandir categorias que contêm itens filtrados
   useEffect(() => {
     if (searchTerm.trim()) {
       const groupedItems = filteredItems.reduce((acc, item) => {
@@ -66,16 +69,25 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
   const fetchItems = async () => {
     try {
       setIsLoading(true);
+      setError(null);
+
+      if (!carnivalId) {
+        setItems([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('shopping_list')
         .select('*')
-        .order('completed', { ascending: true }) // Uncompleted items first
+        .eq('carnival_id', carnivalId)
+        .order('completed', { ascending: true })
         .order('created_at', { ascending: true });
 
       if (error) throw error;
       setItems(data || []);
     } catch (error) {
       console.error('Error fetching shopping list:', error);
+      setError('Não foi possível carregar a lista de compras. Por favor, tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -89,6 +101,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
       return;
     }
 
+    if (!carnivalId) {
+      alert('Nenhum carnaval selecionado.');
+      return;
+    }
+
     try {
       setIsLoading(true);
       const { error } = await supabase
@@ -97,19 +114,17 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
           name,
           quantity,
           category,
-          completed: false
+          completed: false,
+          carnival_id: carnivalId
         }]);
 
       if (error) throw error;
       
-      // Reset form
       setName('');
       setQuantity(1);
       
-      // Refresh items list
       fetchItems();
       
-      // Ensure the category is expanded when adding a new item
       setExpandedCategories(prev => ({
         ...prev,
         [category]: true
@@ -132,7 +147,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
 
       if (error) throw error;
       
-      // Refresh items list
       fetchItems();
     } catch (error) {
       console.error('Error updating item status:', error);
@@ -154,7 +168,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
 
       if (error) throw error;
       
-      // Refresh items list
       fetchItems();
     } catch (error) {
       console.error('Error deleting item:', error);
@@ -164,7 +177,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
     }
   };
 
-  // Toggle category expansion
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => ({
       ...prev,
@@ -172,12 +184,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
     }));
   };
 
-  // Função para normalizar texto (remover acentos)
   const normalizeText = (text: string): string => {
     return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   };
 
-  // Filtrar itens com base no termo de busca
   const filterItems = () => {
     if (!searchTerm.trim()) {
       setFilteredItems(items);
@@ -189,18 +199,16 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
     const filtered = items.filter(item => {
       const normalizedName = normalizeText(item.name);
       
-      // Busca por iniciais, palavras contidas, letras finais
       return (
-        normalizedName.startsWith(normalizedSearchTerm) || // Iniciais
-        normalizedName.includes(normalizedSearchTerm) ||   // Contém a palavra/letras
-        normalizedName.endsWith(normalizedSearchTerm)      // Letras finais
+        normalizedName.startsWith(normalizedSearchTerm) ||
+        normalizedName.includes(normalizedSearchTerm) ||
+        normalizedName.endsWith(normalizedSearchTerm)
       );
     });
     
     setFilteredItems(filtered);
   };
 
-  // Group items by category
   const groupedItems = filteredItems.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
@@ -208,6 +216,33 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
     acc[item.category].push(item);
     return acc;
   }, {} as Record<string, ShoppingItem[]>);
+
+  if (!carnivalId) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle size={48} className="mx-auto text-gray-400 mb-4" />
+          <p className="text-gray-600">Selecione um carnaval para ver a lista de compras</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <AlertCircle size={48} className="text-red-500 mb-4" />
+        <p className="text-gray-700 mb-4">{error}</p>
+        <button
+          onClick={fetchItems}
+          className="btn-primary flex items-center"
+        >
+          <RefreshCw size={16} className="mr-2" />
+          Tentar Novamente
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -288,7 +323,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
               </div>
             </div>
             
-            {/* Campo de busca */}
             <div className="relative mb-4">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search size={16} className="text-gray-400" />
@@ -366,11 +400,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ supabase }) => {
                         <div className="space-y-2 pl-2">
                           {groupedItems[category]
                             .sort((a, b) => {
-                              // Sort by completion status first (incomplete items first)
                               if (a.completed !== b.completed) {
                                 return a.completed ? 1 : -1;
                               }
-                              // Then by creation date
                               return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime();
                             })
                             .map((item) => (

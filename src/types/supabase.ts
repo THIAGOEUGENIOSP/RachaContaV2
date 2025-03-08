@@ -9,6 +9,55 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      carnivals: {
+        Row: {
+          id: string
+          year: number
+          name: string
+          start_date: string
+          end_date: string
+          status: 'planning' | 'active' | 'completed'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          year: number
+          name: string
+          start_date: string
+          end_date: string
+          status?: 'planning' | 'active' | 'completed'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          year?: number
+          name?: string
+          start_date?: string
+          end_date?: string
+          status?: 'planning' | 'active' | 'completed'
+          created_at?: string
+        }
+      }
+      carnival_participants: {
+        Row: {
+          id: string
+          carnival_id: string
+          participant_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          carnival_id: string
+          participant_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          carnival_id?: string
+          participant_id?: string
+          created_at?: string
+        }
+      }
       participants: {
         Row: {
           id: string
@@ -41,6 +90,7 @@ export interface Database {
           date: string
           created_at: string
           payer_id?: string
+          carnival_id?: string
         }
         Insert: {
           id?: string
@@ -50,6 +100,7 @@ export interface Database {
           date: string
           created_at?: string
           payer_id?: string
+          carnival_id?: string
         }
         Update: {
           id?: string
@@ -59,6 +110,7 @@ export interface Database {
           date?: string
           created_at?: string
           payer_id?: string
+          carnival_id?: string
         }
       }
       expense_participants: {
@@ -118,6 +170,7 @@ export interface Database {
           category: string
           completed: boolean
           created_at: string
+          carnival_id?: string
         }
         Insert: {
           id?: string
@@ -126,6 +179,7 @@ export interface Database {
           category: string
           completed?: boolean
           created_at?: string
+          carnival_id?: string
         }
         Update: {
           id?: string
@@ -134,6 +188,7 @@ export interface Database {
           category?: string
           completed?: boolean
           created_at?: string
+          carnival_id?: string
         }
       }
       contributions: {

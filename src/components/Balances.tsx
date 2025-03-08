@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
-import { ArrowRight, RefreshCw, CheckCircle, HelpCircle, DollarSign, CreditCard, Calendar, Tag } from 'lucide-react';
+import { ArrowRight, RefreshCw, CheckCircle, HelpCircle, DollarSign, CreditCard, Calendar, Tag, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 
 interface BalancesProps {
   supabase: SupabaseClient<Database>;
+  carnivalId?: string | null;
 }
 
 interface Participant {
@@ -63,7 +64,7 @@ interface PaymentsByPayer {
   }[];
 }
 
-export const Balances: React.FC<BalancesProps> = ({ supabase }) => {
+export const Balances: React.FC<BalancesProps> = ({ supabase, carnivalId }) => {
   const [balances, setBalances] = useState<Balance[]>([]);
   const [detailedPayments, setDetailedPayments] = useState<DetailedPayment[]>([]);
   const [paymentsByPayer, setPaymentsByPayer] = useState<PaymentsByPayer[]>([]);
@@ -73,37 +74,55 @@ export const Balances: React.FC<BalancesProps> = ({ supabase }) => {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'summary' | 'detailed'>('detailed');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (carnivalId) {
+      fetchData();
+    }
+  }, [carnivalId]);
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      
-      // Fetch participants
-      const { data: participantsData, error: participantsError } = await supabase
-        .from('participants')
-        .select('*')
-        .order('name');
+      setError(null);
 
-      if (participantsError) {
-        console.error('Error fetching participants:', participantsError);
+      if (!carnivalId) {
+        setParticipants([]);
+        setExpenses([]);
+        setBalances([]);
+        setDetailedPayments([]);
+        setPaymentsByPayer([]);
         return;
       }
       
-      setParticipants(participantsData || []);
+      // Fetch participants for this carnival
+      const { data: participantsData, error: participantsError } = await supabase
+        .from('carnival_participants')
+        .select(`
+          participant:participant_id (
+            id,
+            name,
+            type
+          )
+        `)
+        .eq('carnival_id', carnivalId);
+
+      if (participantsError) throw participantsError;
       
-      // Fetch expenses
+      const transformedParticipants = participantsData
+        .map(item => item.participant)
+        .filter((item): item is Participant => item !== null);
+
+      setParticipants(transformedParticipants);
+      
+      // Fetch expenses for this carnival
       const { data: expensesData, error: expensesError } = await supabase
         .from('expenses')
-        .select('*');
+        .select('*')
+        .eq('carnival_id', carnivalId);
 
-      if (expensesError) {
-        console.error('Error fetching expenses:', expensesError);
-        return;
-      }
+      if (expensesError) throw expensesError;
       
       setExpenses(expensesData || []);
       
@@ -112,24 +131,18 @@ export const Balances: React.FC<BalancesProps> = ({ supabase }) => {
         .from('expense_participants')
         .select('*');
 
-      if (expenseParticipantsError) {
-        console.error('Error fetching expense participants:', expenseParticipantsError);
-        return;
-      }
+      if (expenseParticipantsError) throw expenseParticipantsError;
       
       // Fetch payments
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
         .select('*');
 
-      if (paymentsError) {
-        console.error('Error fetching payments:', paymentsError);
-        return;
-      }
+      if (paymentsError) throw paymentsError;
       
       // Calculate balances
       calculateBalances(
-        participantsData || [], 
+        transformedParticipants, 
         expensesData || [], 
         expenseParticipantsData || [],
         paymentsData || []
@@ -137,13 +150,14 @@ export const Balances: React.FC<BalancesProps> = ({ supabase }) => {
       
       // Calculate detailed payments
       calculateDetailedPayments(
-        participantsData || [],
+        transformedParticipants,
         expensesData || [],
         expenseParticipantsData || [],
         paymentsData || []
       );
     } catch (error) {
       console.error('Error fetching data:', error);
+      setError('Não foi possível carregar os dados. Por favor, tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -405,7 +419,6 @@ export const Balances: React.FC<BalancesProps> = ({ supabase }) => {
     }
   };
 
-  // Function to get category color
   const getCategoryColor = (category: string) => {
     switch (category) {
       case 'Aluguel': return 'bg-blue-100 text-blue-800';
@@ -417,6 +430,33 @@ export const Balances: React.FC<BalancesProps> = ({ supabase }) => {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  if (!carnivalId) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle size={48} className="mx-auto text-gray-400 mb-4" />
+          <p className="text-gray-600">Selecione um carnaval para ver os saldos</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <AlertCircle size={48} className="text-red-500 mb-4" />
+        <p className="text-gray-700 mb-4">{error}</p>
+        <button
+          onClick={fetchData}
+          className="btn-primary flex items-center"
+        >
+          <RefreshCw size={16} className="mr-2" />
+          Tentar Novamente
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>

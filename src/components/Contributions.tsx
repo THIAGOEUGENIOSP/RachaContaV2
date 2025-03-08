@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
-import { Upload, Calendar, DollarSign, FileText, Trash2, Eye, RefreshCw, BarChart2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Upload, Calendar, DollarSign, FileText, Trash2, Eye, RefreshCw, BarChart2, ChevronDown, ChevronRight, Search, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 import Chart from 'chart.js/auto';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 interface ContributionsProps {
   supabase: SupabaseClient<Database>;
@@ -66,12 +67,57 @@ export const Contributions: React.FC<ContributionsProps> = ({ supabase }) => {
     }
   }, [contributions]);
 
+  const fetchParticipants = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('participants')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+
+      if (data) {
+        setParticipants(data);
+        if (data.length > 0 && !selectedParticipant) {
+          setSelectedParticipant(data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching participants:', error);
+    }
+  };
+
+  const fetchContributions = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('contributions')
+        .select(`
+          *,
+          participant:participant_id (
+            name
+          )
+        `)
+        .order('month', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        setContributions(data);
+      }
+    } catch (error) {
+      console.error('Error fetching contributions:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const groupContributionsByMonth = () => {
     const grouped = contributions.reduce((acc: GroupedContributions, curr) => {
-      const monthKey = curr.month.substring(0, 7); // Get YYYY-MM
+      const monthKey = curr.month.substring(0, 7);
       if (!acc[monthKey]) {
         acc[monthKey] = [];
-        // Automatically expand the most recent month
         setExpandedMonths(prev => ({
           ...prev,
           [monthKey]: true
@@ -81,7 +127,6 @@ export const Contributions: React.FC<ContributionsProps> = ({ supabase }) => {
       return acc;
     }, {});
 
-    // Sort months in descending order
     const sortedGrouped: GroupedContributions = {};
     Object.keys(grouped)
       .sort((a, b) => b.localeCompare(a))
@@ -161,46 +206,6 @@ export const Contributions: React.FC<ContributionsProps> = ({ supabase }) => {
         }
       }
     });
-  };
-
-  const fetchParticipants = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('participants')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setParticipants(data || []);
-      if (data && data.length > 0 && !selectedParticipant) {
-        setSelectedParticipant(data[0].id);
-      }
-    } catch (error) {
-      console.error('Error fetching participants:', error);
-    }
-  };
-
-  const fetchContributions = async () => {
-    try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('contributions')
-        .select(`
-          *,
-          participant:participant_id (
-            name
-          )
-        `)
-        .order('month', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setContributions(data || []);
-    } catch (error) {
-      console.error('Error fetching contributions:', error);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -336,18 +341,6 @@ export const Contributions: React.FC<ContributionsProps> = ({ supabase }) => {
     <div>
       <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Aportes Mensais</h2>
 
-      <div className="card p-4 md:p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg md:text-xl font-semibold flex items-center">
-            <BarChart2 className="mr-2" size={24} />
-            Total de Aportes por Participante
-          </h3>
-        </div>
-        <div className="h-[300px] md:h-[400px]">
-          <canvas ref={chartRef}></canvas>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         <div className="lg:col-span-1">
           <div className="card p-3 md:p-6">
@@ -453,13 +446,6 @@ export const Contributions: React.FC<ContributionsProps> = ({ supabase }) => {
           <div className="card p-3 md:p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg md:text-xl font-semibold">Histórico de Aportes</h3>
-              <button 
-                onClick={fetchContributions}
-                className="text-emerald-600 hover:text-emerald-700 flex items-center text-sm"
-              >
-                <RefreshCw size={16} className="mr-1" />
-                Atualizar
-              </button>
             </div>
 
             {isLoading && contributions.length === 0 ? (
@@ -504,7 +490,6 @@ export const Contributions: React.FC<ContributionsProps> = ({ supabase }) => {
                                 <th className="px-3 md:px-6 py-2 md:py-3 text-xs">Participante</th>
                                 <th className="px-3 md:px-6 py-2 md:py-3 text-xs">Valor</th>
                                 <th className="px-3 md:px-6 py-2 md:py-3 text-xs">Comprovante</th>
-                                <th className="px-3 md:px-6 py-2 md:py-3 text-xs">Ações</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -531,15 +516,6 @@ export const Contributions: React.FC<ContributionsProps> = ({ supabase }) => {
                                     ) : (
                                       <span className="text-gray-400">-</span>
                                     )}
-                                  </td>
-                                  <td className="px-3 md:px-6 py-2 md:py-4 text-xs md:text-sm">
-                                    <button
-                                      onClick={() => handleDelete(contribution.id)}
-                                      className="text-red-500 hover:text-red-700"
-                                      title="Excluir"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
                                   </td>
                                 </tr>
                               ))}

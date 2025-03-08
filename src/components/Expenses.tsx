@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
-import { Trash2, Plus, Users, DollarSign, RefreshCw, UserCheck, UserX } from 'lucide-react';
+import { Trash2, Plus, Users, DollarSign, RefreshCw, UserCheck, UserX, AlertCircle } from 'lucide-react';
 import { formatCurrency, parseInputValue } from '../utils/formatters';
 
 interface ExpensesProps {
   supabase: SupabaseClient<Database>;
+  carnivalId?: string | null;
 }
 
 interface Participant {
@@ -33,7 +34,7 @@ interface ExpenseParticipant {
   participant?: Participant;
 }
 
-export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
+export const Expenses: React.FC<ExpensesProps> = ({ supabase, carnivalId }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [description, setDescription] = useState('');
@@ -48,6 +49,7 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
   const [currentExpenseId, setCurrentExpenseId] = useState<string | null>(null);
   const [expenseParticipants, setExpenseParticipants] = useState<ExpenseParticipant[]>([]);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchExpenses();
@@ -69,7 +71,7 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
       setParticipants(data || []);
       if (data && data.length > 0 && !payerId) {
         setPayerId(data[0].id);
-        setSelectedParticipants(data.map(p => p.id)); // Select all participants by default
+        setSelectedParticipants(data.map(p => p.id));
       }
     } catch (error) {
       console.error('Error fetching participants:', error);
@@ -79,22 +81,26 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
   const fetchExpenses = async () => {
     try {
       setIsLoading(true);
+      
+      if (!carnivalId) {
+        setExpenses([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('expenses')
         .select(`
           *,
           payer:payer_id(id, name)
         `)
+        .eq('carnival_id', carnivalId)
         .order('date', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching expenses:', error);
-        return;
-      }
-      
+      if (error) throw error;
       setExpenses(data || []);
     } catch (error) {
       console.error('Error fetching expenses:', error);
+      setError('Não foi possível carregar as despesas. Por favor, tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -162,7 +168,6 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
       return;
     }
 
-    // Parse amount from formatted string to number
     const numericAmount = parseFloat(
       amount.replace(/\./g, '').replace(',', '.')
     );
@@ -175,7 +180,6 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
     try {
       setIsLoading(true);
       
-      // Insert expense
       const { data: expenseData, error: expenseError } = await supabase
         .from('expenses')
         .insert([{
@@ -183,7 +187,8 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
           amount: numericAmount,
           category,
           date,
-          payer_id: payerId
+          payer_id: payerId,
+          carnival_id: carnivalId
         }])
         .select();
 
@@ -200,14 +205,11 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
       
       const expenseId = expenseData[0].id;
       
-      // Calculate amount per participant based on division type
       let amountsPerParticipant: Record<string, number> = {};
       
       if (divisionType === 'equal') {
-        // Get the total number of "adults" based on participant type
         let totalAdults = 0;
         
-        // Count adults (individuals count as 1, couples count as 2)
         selectedParticipants.forEach(participantId => {
           const participant = participants.find(p => p.id === participantId);
           if (participant) {
@@ -215,10 +217,8 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
           }
         });
         
-        // Calculate per-adult share
         const amountPerAdult = numericAmount / totalAdults;
         
-        // Assign amounts based on participant type
         selectedParticipants.forEach(participantId => {
           const participant = participants.find(p => p.id === participantId);
           if (participant) {
@@ -227,15 +227,12 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
           }
         });
       } else {
-        // For now, just equal division
-        // TODO: Implement other division types
         const amountPerPerson = numericAmount / selectedParticipants.length;
         selectedParticipants.forEach(participantId => {
           amountsPerParticipant[participantId] = amountPerPerson;
         });
       }
       
-      // Insert expense participants
       const expenseParticipantsData = selectedParticipants.map(participantId => ({
         expense_id: expenseId,
         participant_id: participantId,
@@ -252,17 +249,14 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
         return;
       }
       
-      // Show success message
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
       
-      // Reset form
       setDescription('');
       setAmount('');
       setCategory('Aluguel');
       setDate(new Date().toISOString().split('T')[0]);
       
-      // Refresh expenses list
       fetchExpenses();
     } catch (error) {
       console.error('Error adding expense:', error);
@@ -278,7 +272,6 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
     try {
       setIsLoading(true);
       
-      // First delete expense participants
       const { error: participantsError } = await supabase
         .from('expense_participants')
         .delete()
@@ -290,7 +283,6 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
         return;
       }
       
-      // Then delete the expense
       const { error } = await supabase
         .from('expenses')
         .delete()
@@ -302,7 +294,6 @@ export const Expenses: React.FC<ExpensesProps> = ({ supabase }) => {
         return;
       }
       
-      // Refresh expenses list
       fetchExpenses();
     } catch (error) {
       console.error('Error deleting expense:', error);
